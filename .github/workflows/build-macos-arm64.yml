@@ -1,0 +1,75 @@
+name: Build macOS ARM64 (Apple Silicon) Wheel
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-macos-arm64:
+    runs-on: macos-14  # macOS 14 运行在 Apple Silicon (M1/M2)
+    name: Build macOS ARM64 Wheel
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    
+    - name: Verify ARM64 architecture
+      run: |
+        echo "Architecture: $(uname -m)"
+        python -c "import platform; print(f'Python platform: {platform.machine()}')"
+    
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools wheel cython numpy
+    
+    - name: Build wheel
+      run: |
+        python setup.py bdist_wheel
+    
+    - name: List built wheels
+      run: |
+        ls -lh dist/
+        echo "Wheel info:"
+        python -m pip show wheel || true
+        for whl in dist/*.whl; do
+          echo "=== $whl ==="
+          unzip -l "$whl" | head -20
+        done
+    
+    - name: Test wheel installation
+      run: |
+        pip install dist/*.whl
+        python -c "import pydensecrf; print('pydensecrf imported successfully')"
+    
+    - name: Upload wheel to release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/*.whl
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
+        body: |
+          macOS ARM64 (Apple Silicon M1/M2/M3) wheel for pydensecrf
+          
+          安装方法:
+          ```bash
+          pip install pydensecrf-*-macosx_*_arm64.whl
+          ```
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: pydensecrf-macos-arm64-wheel
+        path: dist/*.whl
