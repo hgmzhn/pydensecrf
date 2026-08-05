@@ -1,0 +1,44 @@
+name: Build Linux x86_64 Wheel
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag that receives the wheel
+        required: true
+        default: v1.0.0
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux-x86_64:
+    runs-on: ubuntu-latest
+    name: Build Linux x86_64 Wheel
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build manylinux wheel
+        uses: pypa/cibuildwheel@v2.23.3
+        env:
+          CIBW_BUILD: cp312-manylinux_x86_64
+          CIBW_ARCHS_LINUX: x86_64
+          CIBW_TEST_COMMAND: python -c "import pydensecrf; print('pydensecrf imported successfully')"
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pydensecrf-linux-x86_64-wheel
+          path: wheelhouse/*.whl
+
+      - name: Upload wheel to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wheelhouse/*.whl
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          fail_on_unmatched_files: true
